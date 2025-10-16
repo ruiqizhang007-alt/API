@@ -1,0 +1,12 @@
+{
+  "name": "hangout-vercel-api",
+  "version": "1.0.0",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "start": "node api/itinerary-llm.js"
+  },
+  "dependencies": {
+    "openai": "^4.56.0"
+  }
+}

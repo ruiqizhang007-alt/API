@@ -1,0 +1,51 @@
+[
+  {
+    "input": {
+      "city": "上海",
+      "group_size": 3,
+      "date": "2025-10-20",
+      "start_time": "14:00",
+      "duration_hours": 4,
+      "vibe": "chill",
+      "budget": "standard",
+      "transport": "walk",
+      "diet": "any",
+      "must_include": [
+        "咖啡",
+        "甜品"
+      ],
+      "notes": "不吃辣"
+    },
+    "output": {
+      "title": "上海下午轻松小聚 · 三人行",
+      "segments": [
+        {
+          "start": "14:00",
+          "end": "14:15",
+          "label": "集合",
+          "detail": "衡山路约定地点集合，确认人数、路线"
+        },
+        {
+          "start": "14:15",
+          "end": "15:00",
+          "label": "咖啡与甜品",
+          "detail": "去附近人气咖啡店，首推芝士蛋糕与手冲"
+        },
+        {
+          "start": "15:00",
+          "end": "16:00",
+          "label": "城市漫步",
+          "detail": "沿武康路慢走，拍照打卡老洋房"
+        },
+        {
+          "start": "16:00",
+          "end": "16:30",
+          "label": "收尾闲聊",
+          "detail": "小书店坐坐，分享近期灵感"
+        }
+      ],
+      "backup": "下雨改为室内桌游吧 / 咖啡馆二层阅读区聊天",
+      "full_text": "一个松弛的下午，从衡山路开始……"
+    }
+  }
+]

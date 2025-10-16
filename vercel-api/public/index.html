@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Hangout 详细计划（Vercel·API 版）</title>
+<style>
+:root{--ink:#222;--muted:#666;--border:#e7e7e7;--accent:#2b7cff;--glass:rgba(255,255,255,.92)}
+*{box-sizing:border-box}body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;background:#f6f6f6;color:var(--ink)}
+.wrap{max-width:960px;margin:24px auto;padding:0 14px}.panel{background:var(--glass);backdrop-filter:blur(6px);border:1px solid var(--border);border-radius:16px;padding:16px}
+h1{margin:0 0 8px;font-size:22px}label{display:block;font-size:12px;color:var(--muted);margin:8px 0 4px}
+input,select,textarea{width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:#fff}
+.row{display:grid;gap:10px}@media(min-width:760px){.row{grid-template-columns:1fr 1fr}}
+.btn{display:inline-flex;align-items:center;gap:8px;padding:10px 14px;border:1px solid var(--border);border-radius:10px;background:#fff;cursor:pointer}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}.btn:disabled{opacity:.6;cursor:not-allowed}
+.card{background:#fff;border:1px solid var(--border);border-radius:14px;padding:12px;margin-top:12px}
+.timeline{border-left:2px solid #dcdcdc;padding-left:12px}.t{margin:10px 0}.t strong{display:inline-block;min-width:90px}
+.code{background:#f8f8f8;border:1px solid #eee;border-radius:8px;padding:8px 10px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;overflow:auto}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="panel">
+    <h1>Hangout 详细计划（由 LLM API 生成）</h1>
+    <div class="row" style="margin-top:8px">
+      <div><label>城市/区域</label><input id="city" placeholder="如：上海徐汇 / Beijing Sanlitun"></div>
+      <div><label>人数</label><input id="size" type="number" min="1" value="4"></div>
+      <div><label>日期</label><input id="date" type="date"></div>
+      <div><label>开始时间</label><input id="start" type="time" value="18:00"></div>
+      <div><label>总时长（小时）</label><input id="hours" type="number" step="0.5" value="4"></div>
+      <div><label>氛围</label>
+        <select id="vibe">
+          <option value="chill">轻松随性</option><option value="active">运动活力</option>
+          <option value="cultural">文化/展览</option><option value="romantic">浪漫</option>
+          <option value="party">热闹</option><option value="family">亲子</option>
+        </select>
+      </div>
+      <div><label>预算</label>
+        <select id="budget"><option value="frugal">节省</option><option value="standard" selected>适中</option><option value="premium">稍奢</option></select>
+      </div>
+      <div><label>交通</label>
+        <select id="transport"><option value="walk">步行</option><option value="public">地铁/公交</option><option value="car">自驾/网约车</option></select>
+      </div>
+      <div><label>饮食</label>
+        <select id="diet"><option value="any">不限</option><option value="vegetarian">素食友好</option><option value="halal">清真友好</option></select>
+      </div>
+      <div><label>必须包含（逗号分隔）</label><input id="must" placeholder="咖啡,甜品,桌游"></div>
+    </div>
+    <label style="margin-top:8px">备注（可选）</label>
+    <textarea id="notes" rows="3" placeholder="例：不吃辣/不喝酒/膝盖不好…"></textarea>
+    <div style="margin-top:10px;display:flex;gap:10px;flex-wrap:wrap">
+      <button class="btn primary" id="go">生成计划</button>
+      <button class="btn" id="ics" disabled>下载日历 (.ics)</button>
+    </div>
+  </div>
+  <div class="card">
+    <h3 style="margin:4px 0 8px">详细行程</h3>
+    <div id="plan" class="timeline">（还未生成）</div>
+  </div>
+  <div class="card">
+    <h3 style="margin:4px 0 8px">可复制文本</h3>
+    <pre id="out" class="code">（生成后会出现完整说明）</pre>
+  </div>
+</div>
+<script>
+const planEl=document.querySelector('#plan');const outEl=document.querySelector('#out');const btn=document.querySelector('#go');const icsBtn=document.querySelector('#ics');let latestStd=null;
+const API_URL='/api/itinerary-llm';
+btn.onclick=async()=>{try{planEl.textContent='生成中…';outEl.textContent='（等待 API 返回…）';icsBtn.disabled=true;const body=buildRequestFromUI();
+  const res=await fetch(API_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  if(!res.ok) throw new Error(await res.text()); const data=await res.json(); const std=parseResponseToStandard(data); latestStd=std; renderPlan(std); outEl.textContent=std.full_text||composeTextFromStd(std); icsBtn.disabled=false;
+}catch(e){planEl.textContent='生成失败：'+e.message; outEl.textContent=''; icsBtn.disabled=true;}};
+icsBtn.onclick=()=>{if(!latestStd||!latestStd.segments||!latestStd.segments.length){alert('没有时间段，无法生成 .ics');return;}
+  const f=latestStd.segments[0],l=latestStd.segments[latestStd.segments.length-1]; const ics=toICS({title:latestStd.title||'Hangout',startISO:toISOguess(f.start),endISO:toISOguess(l.end),description:latestStd.full_text||composeTextFromStd(latestStd)});
+  downloadBlob(ics,'text/calendar;charset=utf-8','hangout.ics');};
+function buildRequestFromUI(){const must=(document.querySelector('#must').value||'').split(/[，,]/).map(s=>s.trim()).filter(Boolean);return{city:document.querySelector('#city').value.trim(),group_size:Number(document.querySelector('#size').value||4),date:document.querySelector('#date').value,start_time:document.querySelector('#start').value,duration_hours:Number(document.querySelector('#hours').value||4),vibe:document.querySelector('#vibe').value,budget:document.querySelector('#budget').value,transport:document.querySelector('#transport').value,diet:document.querySelector('#diet').value,must_include:must,notes:document.querySelector('#notes').value.trim()};}
+function parseResponseToStandard(resp){if(resp&&resp.segments&&Array.isArray(resp.segments))return resp; if(typeof resp.plan_text==='string')return{title:'Hangout 计划',segments:[],backup:'',plan_text:resp.plan_text};
+  const segs=[];const raw=resp?.segments||resp?.plan?.segments||resp?.data?.segments||resp?.timeline||resp?.items||[]; if(Array.isArray(raw)){for(const s of raw){segs.push({start:s.start||s.begin||s.from||s.start_time,end:s.end||s.to||s.finish||s.end_time,label:s.label||s.title||s.name||'活动',detail:s.detail||s.desc||s.description||''});}}
+  return{title:resp.title||resp.plan_title||'Hangout 计划',segments:segs,backup:resp.backup||resp.backup_plan||'',full_text:resp.full_text||resp.plan_text||null};}
+function renderPlan(std){if(!std.segments||!std.segments.length){planEl.innerHTML='<div class="t"><strong>计划说明</strong><br><span class="muted">（你的 API 返回的大段文字会显示在右侧）</span></div>';return;}
+  let html='';for(const seg of std.segments){html+=`<div class="t"><strong>${seg.start||''}–${seg.end||''}</strong> ${seg.label}<br><span class="muted">${seg.detail||''}</span></div>`;} if(std.backup){html+=`<div class="t"><strong>备用方案</strong><br><span class="muted" style="white-space:pre-line">${std.backup}</span></div>`;} planEl.innerHTML=html;}
+function composeTextFromStd(std){const lines=[];lines.push(`【主题】${std.title}`);if(std.segments?.length){const f=std.segments[0],l=std.segments[std.segments.length-1];if(f?.start&&l?.end)lines.push(`【时间】${f.start} 起 — ${l.end} 止`);}lines.push('');for(const s of (std.segments||[])){lines.push(`- ${s.start||''}–${s.end||''} · ${s.label}：${s.detail||''}`);}if(std.backup){lines.push('');lines.push('【备用方案】');lines.push(std.backup);}return lines.join('\n');}
+function toISOguess(s){if(!s)return new Date().toISOString(); if(/Z$/.test(s)||/T/.test(s))return new Date(s).toISOString(); if(/^\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}$/.test(s)){const[date,time]=s.split(/\s+/);return new Date(date+'T'+time+':00').toISOString();} if(/^\d{2}:\d{2}$/.test(s)){const d=new Date();const[h,m]=s.split(':').map(Number);d.setHours(h,m,0,0);return d.toISOString();} return new Date().toISOString();}
+function toICS({title,startISO,endISO,description}){const pad=n=>String(n).padStart(2,'0');const fmt=iso=>{const d=new Date(iso);return d.getUTCFullYear()+pad(d.getUTCMonth()+1)+pad(d.getUTCDate())+'T'+pad(d.getUTCHours())+pad(d.getUTCMinutes())+pad(d.getUTCSeconds())+'Z';};const lines=['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//Hangout API Client//EN','BEGIN:VEVENT','UID:'+Math.random().toString(36).slice(2),'DTSTAMP:'+fmt(new Date().toISOString()),'DTSTART:'+fmt(startISO),'DTEND:'+fmt(endISO),'SUMMARY:'+String(title||'Hangout').replace(/\n/g,' '),'DESCRIPTION:'+String(description||'').replace(/\n/g,'\\n'),'END:VEVENT','END:VCALENDAR'];return lines.join('\r\n');}
+function downloadBlob(text,mime,filename){const blob=new Blob([text],{type:mime});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=filename;a.click();URL.revokeObjectURL(url);}
+</script>
+</body>
+</html>
